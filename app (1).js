@@ -75,7 +75,7 @@ function show(id){["start","join","rules","game"].forEach(x=>$(x).classList.togg
 function showJoin(){started=true;show("join");startAudio();play("click")}
 function showRules(){rulesFromStart=true;buildRules();$("rulesBtn").textContent="Back";show("rules")}
 function hostMode(){started=true;startAudio();show("join")}
-function buildRules(){const R=[["💰","Starting capital","$1,000"],["🔨","Maximum bid","$1,000"],["✅","Correct answer","+$500"],["❌","Wrong answer","−$100","bad"],["🎯","Total questions","10"],["🏆","Winner","Highest balance"]];
+function buildRules(){const R=[["💰","Starting capital","$1,000"],["🔨","Maximum bid","$1,000"],["✅","Correct answer","+$500"],["❌","Wrong answer","−$100","bad"],["🎯","Total questions","10"],["⏱️","Time to answer","10 s or −$100","bad"],["🏆","Winner","Highest balance"]];
   $("rgrid").innerHTML=R.map((r,i)=>`<div class="rule ${r[3]||""}" style="animation-delay:${i*.12}s"><em>${r[0]}</em><small>${r[1]}</small><b>${r[2]}</b></div>`).join("")}
 
 /* ---- websocket ---- */
@@ -227,34 +227,40 @@ function render(){
   const winner=me&&s.current_bidder===me.name,done=s.phase==="round_end";
   $("answers").innerHTML=fin?podium(s):q&&q.options?stage(s,q,S,winner,done):"";
   const ra=done&&q?reveal(q,S):null;let r="";
-  if(s.phase==="challenge")r=`<p class="hint">${winner?"You won the bid — pick your answer!":esc(s.current_bidder||"")+" is answering…"}</p>`;
+  if(s.phase==="challenge")r=`<p class="hint">${winner?"You won the bid — pick your answer within 10 seconds!":esc(s.current_bidder||"")+" is answering…"}</p>`;
   if(s.phase==="auction"&&!isHost)r=`<p class="hint">Bid to win the right to answer.</p>`;
   if(done){const q2=ra.t;
     r=s.last_correct?`<div class="result ok">✅ Correct! ${ra.l} — ${esc(q2)}<br>+$500 for ${esc(s.current_bidder)}</div>`
-      :`<div class="result bad">❌ Wrong! Answer: ${ra.l} — ${esc(q2)}<br>−$100 for ${esc(s.current_bidder)}</div>`}
+      :`<div class="result bad">${s.picked==null?"⏰ Time's up!":"❌ Wrong!"} Answer: ${ra.l} — ${esc(q2)}<br>−$100 for ${esc(s.current_bidder)}</div>`}
   $("result").innerHTML=r+(ra&&ra.ok?`<div class="why"><b>Why?</b> ${esc(S.why)}</div>`:"");
   hostNext(s);timerSync(s);
 }
 
-/* ---- auction timer ----
-   Runs in each browser (server.py is unchanged). The HOST's browser sends "sold" automatically at 0.
-   Change AUCTION_SECONDS to adjust; set RESET_ON_BID=true to restart the clock after every new bid. */
-const AUCTION_SECONDS=15,RESET_ON_BID=false;
-let tEnd=0,tRound=-1,tFired=-1,tLastBid=0,tShown=null;
-const timeUp=s=>tRound===s.round&&Date.now()>=tEnd;
+/* ---- timers: auction (bidding) + challenge (answering) ----
+   Runs in each browser; server.py is unchanged. The HOST's browser acts at 0:
+   auction -> sends "sold" · challenge -> sends "mark_answer" {correct:false} (existing server action = -$100, same as a wrong answer).
+   Change the constants below to adjust. RESET_ON_BID=true restarts the bidding clock after each new bid. */
+const AUCTION_SECONDS=15,ANSWER_SECONDS=10,RESET_ON_BID=false;
+let tEnd=0,tKey="",tFired="",tLastBid=0,tShown=null,tDur=0;
+const tPhase=s=>s.phase==="auction"||s.phase==="challenge";
+const timeUp=s=>s.phase==="auction"&&tKey===s.phase+s.round&&Date.now()>=tEnd;
 function timerSync(s){
-  if(s.phase!=="auction"){tRound=-1;return}
-  if(tRound!==s.round){tRound=s.round;tFired=-1;tLastBid=s.current_bid;
-    tEnd=Date.now()+(prev&&prev.phase!=="auction"?2400:0)+AUCTION_SECONDS*1000} // wait for the 3-2-1-GO overlay
-  else if(RESET_ON_BID&&s.current_bid>tLastBid){tLastBid=s.current_bid;tEnd=Date.now()+AUCTION_SECONDS*1000}}
+  if(!tPhase(s)){tKey="";return}
+  const key=s.phase+s.round;
+  if(tKey!==key){tKey=key;tFired="";tLastBid=s.current_bid;tDur=(s.phase==="auction"?AUCTION_SECONDS:ANSWER_SECONDS)*1000;
+    tEnd=Date.now()+(prev&&prev.phase!==s.phase?(s.phase==="auction"?2400:2000):0)+tDur} // wait for the countdown / SOLD overlay
+  else if(RESET_ON_BID&&s.phase==="auction"&&s.current_bid>tLastBid){tLastBid=s.current_bid;tEnd=Date.now()+tDur}}
 setInterval(()=>{const s=latest,el=$("timer");
-  if(!s||s.phase!=="auction"||tRound!==s.round){el.classList.add("hidden");return}
-  const ms=tEnd-Date.now(),sec=Math.max(0,Math.ceil(Math.min(ms,AUCTION_SECONDS*1000)/1000));
-  el.classList.remove("hidden");el.textContent=ms>0?sec:(s.current_bidder?"TIME!":"No bids");
+  if(!s||!tPhase(s)||tKey!==s.phase+s.round){el.classList.add("hidden");return}
+  const auc=s.phase==="auction",ms=tEnd-Date.now(),sec=Math.max(0,Math.ceil(Math.min(ms,tDur)/1000));
+  el.classList.remove("hidden");el.textContent=ms>0?sec:(auc?(s.current_bidder?"TIME!":"No bids"):"TIME'S UP!");
   el.classList.toggle("warn",ms>0&&sec<=5);
   if(sec!==tShown){tShown=sec;if(ms>0&&sec<=5&&started)play("tick")}
-  if(ms<=0){document.querySelectorAll("#bidButtons .chip").forEach(b=>b.disabled=true);
-    if(role==="host"&&tFired!==s.round&&s.current_bidder){tFired=s.round;send("sold")}}},100);
+  if(ms<=0){
+    if(auc){document.querySelectorAll("#bidButtons .chip").forEach(b=>b.disabled=true);
+      if(role==="host"&&tFired!==tKey&&s.current_bidder){tFired=tKey;send("sold")}}
+    else{document.querySelectorAll("#answers .opt").forEach(b=>b.disabled=true);
+      if(role==="host"&&tFired!==tKey){tFired=tKey;send("mark_answer",{correct:false})}}}},100);
 /* ---- host: highlight the next logical control, Space triggers it ---- */
 function hostNext(s){if(role!=="host")return;const m={lobby:"open_auction",auction:"sold",round_end:"next_round",finished:"reset"}[s.phase];
   document.querySelectorAll("#hostCard [data-act]").forEach(b=>b.classList.toggle("next",b.dataset.act===m))}
