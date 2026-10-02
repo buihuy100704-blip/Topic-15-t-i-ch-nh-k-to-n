@@ -86,17 +86,24 @@ def pub_q(room, viewer=None):
         out["answer"] = q["answer"]
     return out
 
-def public_state(room, viewer=None):
-    players = []
-    for p in room.players.values():
-        players.append({
-            "name": p.name,
-            "balance": p.balance,
-            "correct": p.correct,
-            "total_bid": p.total_bid,
-        })
+TOP_N = 10  # leaderboard rows sent to clients (keeps messages small with ~100 players)
+
+def ranked_players(room):
+    """Full ranking, computed ONCE per broadcast and shared by every recipient."""
+    players = [{
+        "name": p.name,
+        "balance": p.balance,
+        "correct": p.correct,
+        "total_bid": p.total_bid,
+    } for p in room.players.values()]
     players.sort(key=lambda x: (-x["balance"], -x["correct"], -x["total_bid"], x["name"]))
+    return players
+
+def public_state(room, viewer=None, ranked=None):
+    if ranked is None:
+        ranked = ranked_players(room)
     me = room.players.get(viewer) if viewer else None
+    bidder = room.players.get(room.current_bidder) if room.current_bidder else None
     return {
         "round": room.round,
         "round_number": room.round + 1,
@@ -106,10 +113,13 @@ def public_state(room, viewer=None):
         "current_bidder": room.current_bidder,
         "sold": room.sold,
         "max_bid": MAX_BID,
-        "players": players,
+        "players": ranked[:TOP_N],
+        "player_count": len(ranked),
+        "current_bidder_balance": bidder.balance if bidder else None,
         "player": None if not me else {
             "name": me.name, "balance": me.balance,
-            "correct": me.correct, "total_bid": me.total_bid
+            "correct": me.correct, "total_bid": me.total_bid,
+            "rank": next((i + 1 for i, x in enumerate(ranked) if x["name"] == me.name), None)
         },
         "question": pub_q(room, viewer),
         "picked": room.picked,
@@ -124,11 +134,14 @@ async def send(ws, obj):
             pass
 
 async def broadcast(room):
+    ranked = ranked_players(room)  # sort once, share with every recipient
+    jobs = []
     if room.host:
-        await send(room.host, {"type":"state", "state": public_state(room, None)})
+        jobs.append(send(room.host, {"type":"state", "state": public_state(room, None, ranked)}))
     for p in list(room.players.values()):
         if p.ws:
-            await send(p.ws, {"type":"state", "state": public_state(room, p.name)})
+            jobs.append(send(p.ws, {"type":"state", "state": public_state(room, p.name, ranked)}))
+    await asyncio.gather(*jobs)  # send to everyone in parallel; a slow phone doesn't block the rest
 
 @app.get("/")
 async def index():
@@ -177,6 +190,7 @@ async def websocket_endpoint(ws: WebSocket, room_id: str, role: str):
             msg = json.loads(await ws.receive_text())
             action = msg.get("action")
 
+            bid_ok = False
             async with room.lock:
                 if action == "open_auction" and role == "host":
                     if room.round >= TOTAL_ROUNDS:
@@ -200,6 +214,7 @@ async def websocket_endpoint(ws: WebSocket, room_id: str, role: str):
                     ):
                         room.current_bid = amount
                         room.current_bidder = p.name
+                        bid_ok = True
 
                 elif action in ("sell","sold") and role == "host":
                     if room.phase == "auction" and room.current_bidder:
@@ -270,7 +285,8 @@ async def websocket_endpoint(ws: WebSocket, room_id: str, role: str):
                     room.current_bidder = None
                     room.sold = False; room.picked = None; room.last_correct = None
 
-            await broadcast(room)
+            if action != "bid" or bid_ok:  # rejected bids change nothing -> no broadcast
+                await broadcast(room)
 
     except WebSocketDisconnect:
         if role == "host" and room.host is ws:
