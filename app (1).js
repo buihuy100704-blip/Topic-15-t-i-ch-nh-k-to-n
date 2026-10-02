@@ -253,7 +253,7 @@ function timerSync(s){
 setInterval(()=>{const s=latest,el=$("timer");
   if(!s||!tPhase(s)||tKey!==s.phase+s.round){el.classList.add("hidden");return}
   const auc=s.phase==="auction",ms=tEnd-Date.now(),sec=Math.max(0,Math.ceil(Math.min(ms,tDur)/1000));
-  el.classList.remove("hidden");el.textContent=ms>0?sec:(auc?(s.current_bidder?"TIME!":"No bids"):"TIME'S UP!");
+  el.classList.remove("hidden");el.textContent=ms>0?"⏱ "+sec:(auc?(s.current_bidder?"TIME!":"No bids"):"TIME'S UP!");
   el.classList.toggle("warn",ms>0&&sec<=5);
   if(sec!==tShown){tShown=sec;if(ms>0&&sec<=5&&started)play("tick")}
   if(ms<=0){
