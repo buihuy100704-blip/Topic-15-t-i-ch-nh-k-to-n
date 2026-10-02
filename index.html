@@ -61,7 +61,7 @@ input{width:100%;font:inherit;color:var(--navy);padding:12px 16px;margin:6px 0 1
 .narrow{max-width:540px;margin:24px auto}
 /* ===== Rules ===== */
 .rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:14px 0}
-.rule{background:#fff;border:3px solid var(--navy);border-radius:22px;padding:14px;text-align:center;box-shadow:0 4px 0 var(--navy);opacity:0;animation:slide .5s forwards}
+.rule{background:#fff;border:3px solid var(--navy);border-radius:22px;padding:14px;text-align:center;box-shadow:0 4px 0 var(--navy);animation:slide .5s both}
 .rule em{display:block;font-style:normal;font-size:38px}.rule small{display:block;opacity:.7;font-size:14px}.rule b{font-size:26px;color:var(--em2)}
 .rule.bad b{color:var(--red)}
 /* ===== Game layout ===== */
@@ -141,6 +141,9 @@ input{width:100%;font:inherit;color:var(--navy);padding:12px 16px;margin:6px 0 1
 .meter{position:absolute;left:10%;right:10%;bottom:8px;height:14px;border:3px solid var(--navy);border-radius:9px;background:#fff;overflow:hidden}.meter div{height:100%;width:100%;background:var(--red);animation:rise2 3s ease-in-out infinite alternate}@keyframes rise2{from{width:30%}}
 .hp{margin-top:8px;height:22px;border:3px solid var(--navy);border-radius:12px;background:#fff;overflow:hidden}.hp div{height:100%;background:var(--red);transition:width 1s}
 .why{margin-top:12px;background:#fff;border:3px solid var(--navy);border-radius:20px;padding:14px 18px;font-size:clamp(17px,2vw,24px);text-align:left;animation:slide .5s both}
+.timer{display:inline-grid;place-items:center;min-width:64px;height:64px;padding:0 16px;margin-left:10px;border-radius:32px;background:var(--navy);color:var(--gold);font-size:34px;vertical-align:middle}
+.timer.warn{background:var(--red);color:#fff;animation:pulse .5s infinite}
+body.host .timer{font-size:60px;min-width:110px;height:100px;border-radius:50px}
 /* ===== Host / Zoom projection mode ===== */
 .hbar{display:flex;gap:12px;flex-wrap:wrap}
 body.host .hbar .btn{flex:1;font-size:26px;padding:18px 20px}body.host .hbar .btn.sm{flex:0 0 auto;font-size:16px;padding:8px 14px}
@@ -199,7 +202,7 @@ body.host #hostCard{position:sticky;bottom:8px;z-index:20}
 <div class="q" id="question">Waiting for host…</div>
 <div id="answers"></div><div id="result"></div>
 <div class="card white" id="auctionCard"><div class="auction"><div>
-<span class="live">🔨 LIVE AUCTION</span>
+<span class="live">🔨 LIVE AUCTION</span><span class="timer hidden" id="timer">15</span>
 <div style="margin-top:8px">Current bid</div>
 <div class="bidnow" id="bid">$0</div><span class="bidflash" id="bidflash">BID!</span>
 <div>Highest bidder<br><span class="leader" id="leader"><svg width="24" height="24"><use href="#coin"/></svg><b id="bidder">—</b></span></div></div>
@@ -215,4 +218,4 @@ body.host #hostCard{position:sticky;bottom:8px;z-index:20}
 <div class="card green"><div>Your balance</div><div class="bal" id="balance">$1,000</div><div id="stats"></div></div>
 <div class="card white"><h3>🏆 Leaderboard</h3><div id="players"></div></div>
 </aside></div></section></div>
-<script src="/app.js?v=10"></script></body></html>
+<script src="/app.js?v=11"></script></body></html>
