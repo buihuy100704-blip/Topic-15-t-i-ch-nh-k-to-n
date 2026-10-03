@@ -25,6 +25,7 @@ header b{font-size:22px}
 .card{background:var(--gold);border:3px solid var(--navy);border-radius:var(--r);padding:20px;margin-bottom:18px;box-shadow:var(--sh)}
 .card.white{background:#fff}
 .card.green{background:var(--em);color:#fff}
+.card.green .pill{color:var(--navy)}
 h1,h2,h3{margin:0 0 8px}
 .center{text-align:center}
 .pill{display:inline-block;background:#fff;border:3px solid var(--navy);border-radius:999px;padding:3px 14px;margin:0 6px 6px 0;font-size:15px;text-transform:uppercase}
@@ -218,4 +219,7 @@ body.host #hostCard{position:sticky;bottom:8px;z-index:20}
 <div class="card green"><div>Your balance</div><div class="bal" id="balance">$1,000</div><div id="stats"></div></div>
 <div class="card white"><h3>🏆 Leaderboard</h3><div id="players"></div></div>
 </aside></div></section></div>
-<script src="/app.js?v=12"></script></body></html>
+<div id="err" class="hidden" style="position:fixed;left:0;right:0;top:0;z-index:99;background:#ef4b4b;color:#fff;padding:10px 16px;font-size:16px"></div>
+<script>window.addEventListener("error",function(e){if(!e.message)return;var b=document.getElementById("err");b.classList.remove("hidden");b.textContent="⚠ Error: "+e.message+(e.filename?" ("+e.filename.split("/").pop()+":"+e.lineno+")":"")},true)</script>
+<script src="/app.js?v=14"></script>
+<script>if(typeof showJoin!=="function"){var b=document.getElementById("err");b.classList.remove("hidden");b.textContent="⚠ app.js did not load. Put app.js in the SAME folder as server.py, then redeploy."}</script></body></html>
